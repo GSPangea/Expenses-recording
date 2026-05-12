@@ -9,7 +9,7 @@ import io
 
 # Configuration
 UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'pdf'}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 # Create Flask app
@@ -61,7 +61,7 @@ def upload_receipt():
         return jsonify({'success': False, 'error': 'No file selected'}), 400
     
     if not allowed_file(file.filename):
-        return jsonify({'success': False, 'error': 'Invalid file type. Allowed: PNG, JPG, JPEG, GIF, BMP'}), 400
+        return jsonify({'success': False, 'error': 'Invalid file type. Allowed: PNG, JPG, JPEG, GIF, BMP, PDF'}), 400
     
     try:
         # Save file
@@ -70,9 +70,9 @@ def upload_receipt():
         file.save(filepath)
         
         # Validate it's a real image
-        if not receipt_processor.validate_image(filepath):
+        if not receipt_processor.validate_file(filepath):
             os.remove(filepath)
-            return jsonify({'success': False, 'error': 'Invalid image file'}), 400
+            return jsonify({'success': False, 'error': 'Invalid or unreadable file'}), 400
         
         # Process receipt with OCR
         result = receipt_processor.process_receipt(filepath)

@@ -5,6 +5,7 @@ import re
 from datetime import datetime
 from PIL import Image
 import ollama
+import fitz  # pymupdf
 
 _MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2")
 
@@ -29,9 +30,15 @@ class ReceiptProcessor:
     def __init__(self):
         self.reader = easyocr.Reader(['en'], gpu=False)
 
-    def extract_text(self, image_path: str) -> str:
-        result = self.reader.readtext(image_path)
+    def extract_text(self, file_path: str) -> str:
+        if file_path.lower().endswith(".pdf"):
+            return self._extract_pdf_text(file_path)
+        result = self.reader.readtext(file_path)
         return "\n".join([line[1] for line in result])
+
+    def _extract_pdf_text(self, pdf_path: str) -> str:
+        doc = fitz.open(pdf_path)
+        return "\n".join(page.get_text() for page in doc)
 
     def _parse_with_ollama(self, raw_text: str) -> dict:
         response = ollama.chat(
@@ -46,9 +53,9 @@ class ReceiptProcessor:
         clean = re.sub(r"^```(?:json)?\s*|\s*```$", "", content, flags=re.DOTALL).strip()
         return json.loads(clean)
 
-    def process_receipt(self, image_path: str) -> dict:
+    def process_receipt(self, file_path: str) -> dict:
         try:
-            raw_text = self.extract_text(image_path)
+            raw_text = self.extract_text(file_path)
             data = self._parse_with_ollama(raw_text)
 
             return {
@@ -62,7 +69,13 @@ class ReceiptProcessor:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def validate_image(self, file_path: str) -> bool:
+    def validate_file(self, file_path: str) -> bool:
+        if file_path.lower().endswith(".pdf"):
+            try:
+                doc = fitz.open(file_path)
+                return doc.page_count > 0
+            except Exception:
+                return False
         try:
             img = Image.open(file_path)
             img.verify()
